@@ -1,4 +1,11 @@
-app.post('/upload', async (req, res) => {
+import fetch from 'node-fetch';
+import FormData from 'form-data';
+
+export default async function handler(req, res) {
+	if (req.method !== 'POST') {
+		return res.status(405).json({ error: 'Method Not Allowed' });
+	}
+
 	const { HASH, URL } = req.body;
 
 	if (!HASH || !URL) {
@@ -24,7 +31,7 @@ app.post('/upload', async (req, res) => {
 			res.status(400).json({ error: `Catbox error: ${result}` });
 		}
 	} catch (err) {
-		console.error('Upload route error:', err);
+		console.error('Upload error:', err);
 		res.status(500).json({ error: 'Internal Server Error' });
 	}
-});
+}
