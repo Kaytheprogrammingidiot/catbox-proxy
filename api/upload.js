@@ -1,31 +1,56 @@
+const Busboy = require('busboy');
+
 module.exports = async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // CORS headers first
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  // Preflight
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (req.method === "GET") {
-    return res.status(200).json({ message: "Proxy alive" });
-  }
+  // Health check
+  if (req.method === 'GET') return res.status(200).json({ message: 'Proxy alive' });
 
-  if (req.method !== "POST") {
+  // Method guard
+  if (req.method !== 'POST') {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
   try {
-    let rawBody = "";
-    for await (const chunk of req) rawBody += chunk;
+    const busboy = new Busboy({ headers: req.headers });
+    const fields = {};
+    const files = [];
 
-    return res.status(200).json({
-      message: "Received POST",
-      headers: req.headers,
-      body: rawBody.slice(0, 200) // echo first 200 chars
+    busboy.on('field', (name, val) => {
+      fields[name] = val;
     });
+
+    busboy.on('file', (name, file, filename, encoding, mimetype) => {
+      const chunks = [];
+      file.on('data', chunk => chunks.push(chunk));
+      file.on('end', () => {
+        files.push({
+          fieldname: name,
+          filename,
+          encoding,
+          mimetype,
+          size: Buffer.concat(chunks).length
+        });
+      });
+    });
+
+    busboy.on('finish', () => {
+      return res.status(200).json({
+        message: 'Upload received',
+        fields,
+        files
+      });
+    });
+
+    req.pipe(busboy);
   } catch (err) {
-    console.error("Debug error:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    console.error('Busboy error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 };
