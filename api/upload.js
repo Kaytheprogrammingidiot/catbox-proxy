@@ -2,17 +2,17 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 
 module.exports = async (req, res) => {
-	// CORS headers
+	// Always send CORS headers first
 	res.setHeader('Access-Control-Allow-Origin', '*');
 	res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
 	res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-	// Handle preflight OPTIONS request
+	// Handle OPTIONS preflight immediately
 	if (req.method === 'OPTIONS') {
 		return res.status(200).end();
 	}
 
-	// Friendly GET response
+	// Handle GET for health check
 	if (req.method === 'GET') {
 		return res.status(200).json({
 			message: 'Catbox proxy is alive. Use POST with HASH and URL to upload.'
@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
 		return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 	}
 
-	// Read raw body only for POST
+	// Only read body for POST
 	let rawBody = '';
 	req.on('data', chunk => {
 		rawBody += chunk;
