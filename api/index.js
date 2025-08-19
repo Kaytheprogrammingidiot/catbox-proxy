@@ -14,9 +14,12 @@ export default async function handler(req, res) {
 
 		const data = await response.text(); // or .json() if expecting JSON
 
+		res.setHeader('Access-Control-Allow-Origin', '*');
+		res.setHeader('Access-Control-Allow-Methods', 'GET');
 		res.status(200).send(data);
 	} catch (err) {
 		console.error('Proxy error:', err);
 		res.status(500).json({ error: 'Internal Server Error' });
 	}
 }
+
