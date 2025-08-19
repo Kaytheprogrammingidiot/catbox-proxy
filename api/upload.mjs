@@ -5,14 +5,21 @@ import FormData from 'form-data';
 
 /** @type {import('@vercel/node').VercelApiHandler} */
 export default async function handler(req, res) {
-  console.log('Received method:', req.method);
+  // CORS headers for all responses
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle preflight OPTIONS request
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    // Manually read and parse the raw request body
     let rawBody = '';
     for await (const chunk of req) {
       rawBody += chunk;
@@ -24,13 +31,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing HASH or URL' });
     }
 
-    // Prepare form data for Catbox
     const form = new FormData();
     form.append('reqtype', 'urlupload');
     form.append('userhash', HASH);
     form.append('url', URL);
 
-    // Send to Catbox
     const response = await fetch('https://catbox.moe/user/api.php', {
       method: 'POST',
       body: form
