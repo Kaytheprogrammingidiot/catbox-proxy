@@ -1,30 +1,14 @@
-import express from 'express';
-import fetch from 'node-fetch';
-import FormData from 'form-data';
-import cors from 'cors';
+app.post('/upload', async (req, res) => {
+	const { HASH, URL } = req.body;
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-app.post('/api', async (req, res) => {
-	// CORS headers for browser access
-	res.setHeader('Access-Control-Allow-Origin', '*');
-	res.setHeader('Access-Control-Allow-Methods', 'POST');
-	res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-	const { userhash, url } = req.body;
-
-	// Validate input
-	if (!userhash || !url) {
-		return res.status(400).json({ error: 'Missing userhash or url' });
+	if (!HASH || !URL) {
+		return res.status(400).json({ error: 'Missing HASH or URL' });
 	}
 
-	// Prepare form data for Catbox
 	const form = new FormData();
 	form.append('reqtype', 'urlupload');
-	form.append('userhash', userhash);
-	form.append('url', url);
+	form.append('userhash', HASH);
+	form.append('url', URL);
 
 	try {
 		const response = await fetch('https://catbox.moe/user/api.php', {
@@ -35,16 +19,12 @@ app.post('/api', async (req, res) => {
 		const result = await response.text();
 
 		if (result.startsWith('https://')) {
-			res.status(200).send(result);
+			res.status(200).json({ url: result });
 		} else {
 			res.status(400).json({ error: `Catbox error: ${result}` });
 		}
 	} catch (err) {
-		console.error('Proxy error:', err);
+		console.error('Upload route error:', err);
 		res.status(500).json({ error: 'Internal Server Error' });
 	}
-});
-
-app.listen(3000, () => {
-	console.log('Catbox proxy running on port 3000');
 });
