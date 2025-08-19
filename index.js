@@ -1,37 +1,22 @@
-const express = require('express');
-const fetch = require('node-fetch');
-const FormData = require('form-data');
-const cors = require('cors');
+export default async function handler(req, res) {
+	try {
+		const { url } = req.query;
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+		if (!url) {
+			return res.status(400).json({ error: 'Missing URL parameter' });
+		}
 
-app.post('/upload', async (req, res) => {
-    const { url, userhash } = req.body;
+		const response = await fetch(url);
 
-    if (!url || !userhash) {
-        return res.status(400).send('Missing url or userhash');
-    }
+		if (!response.ok) {
+			return res.status(response.status).json({ error: `Upstream error: ${response.statusText}` });
+		}
 
-    const form = new FormData();
-    form.append('reqtype', 'urlupload');
-    form.append('userhash', userhash);
-    form.append('url', url);
+		const data = await response.text(); // or .json() if expecting JSON
 
-    try {
-        const response = await fetch('https://catbox.moe/user/api.php', {
-        method: 'POST',
-        body: form
-        });
-
-        const result = await response.text();
-        res.send(result);
-    } catch (err) {
-        res.status(500).send('Upload failed: ' + err.message);
-    }
-});
-
-app.listen(3000, () => {
-    console.log('Catbox proxy running on port 3000');
-});
+		res.status(200).send(data);
+	} catch (err) {
+		console.error('Proxy error:', err);
+		res.status(500).json({ error: 'Internal Server Error' });
+	}
+}
