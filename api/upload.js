@@ -1,8 +1,8 @@
-const Busboy = require('busboy');
-const fetch = require('node-fetch');
-const FormData = require('form-data');
+import Busboy from 'busboy';
+import fetch from 'node-fetch';
+import FormData from 'form-data';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
@@ -20,63 +20,59 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const busboy = new Busboy({ headers: req.headers });
+    const busboy = Busboy({ headers: req.headers });
     const fields = {};
     let fileBuffer = null;
     let filename = '';
     let mimetype = '';
 
-    busboy.on('field', (name, val) => {
-      fields[name] = val;
-    });
-
-    busboy.on('file', (name, file, fname, encoding, mime) => {
-      console.log(`Incoming file: ${fname} (${mime})`);
-      filename = fname;
-      mimetype = mime;
-      const chunks = [];
-      file.on('data', chunk => chunks.push(chunk));
-      file.on('end', () => {
-        fileBuffer = Buffer.concat(chunks);
-        console.log(`File size: ${fileBuffer.length} bytes`);
+    const busboyPromise = new Promise((resolve, reject) => {
+      busboy.on('field', (name, val) => {
+        fields[name] = val;
       });
-    });
 
-    busboy.on('finish', async () => {
-      if (!fileBuffer) {
-        return res.status(400).json({ error: 'No file received' });
-      }
-
-      const form = new FormData();
-      form.append('reqtype', 'fileupload');
-      form.append('fileToUpload', fileBuffer, filename);
-
-      try {
-        const catboxRes = await fetch('https://catbox.moe/user/api.php', {
-          method: 'POST',
-          body: form,
-          headers: form.getHeaders()
+      busboy.on('file', (name, file, fname, encoding, mime) => {
+        filename = fname;
+        mimetype = mime;
+        const chunks = [];
+        file.on('data', chunk => chunks.push(chunk));
+        file.on('end', () => {
+          fileBuffer = Buffer.concat(chunks);
         });
+      });
 
-        const url = await catboxRes.text();
-        console.log('Catbox response:', url);
-
-        return res.status(200).json({
-          message: 'File uploaded to Catbox',
-          url,
-          fields,
-          filename,
-          mimetype
-        });
-      } catch (err) {
-        console.error('Catbox upload failed:', err);
-        return res.status(500).json({ error: 'Catbox upload failed' });
-      }
+      busboy.on('finish', resolve);
+      busboy.on('error', reject);
     });
 
     req.pipe(busboy);
+    await busboyPromise;
+
+    if (!fileBuffer) {
+      return res.status(400).json({ error: 'No file received' });
+    }
+
+    const form = new FormData();
+    form.append('reqtype', 'fileupload');
+    form.append('fileToUpload', fileBuffer, filename);
+
+    const catboxRes = await fetch('https://catbox.moe/user/api.php', {
+      method: 'POST',
+      body: form,
+      headers: form.getHeaders()
+    });
+
+    const url = await catboxRes.text();
+
+    return res.status(200).json({
+      message: 'File uploaded to Catbox',
+      url,
+      fields,
+      filename,
+      mimetype
+    });
   } catch (err) {
-    console.error('Busboy error:', err);
+    console.error('Upload error:', err);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
-};
+}
