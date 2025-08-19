@@ -1,7 +1,9 @@
 const Busboy = require('busboy');
+const fetch = require('node-fetch');
+const FormData = require('form-data');
 
 module.exports = async (req, res) => {
-  // CORS headers first
+  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -20,32 +22,56 @@ module.exports = async (req, res) => {
   try {
     const busboy = new Busboy({ headers: req.headers });
     const fields = {};
-    const files = [];
+    let fileBuffer = null;
+    let filename = '';
+    let mimetype = '';
 
     busboy.on('field', (name, val) => {
       fields[name] = val;
     });
 
-    busboy.on('file', (name, file, filename, encoding, mimetype) => {
+    busboy.on('file', (name, file, fname, encoding, mime) => {
+      console.log(`Incoming file: ${fname} (${mime})`);
+      filename = fname;
+      mimetype = mime;
       const chunks = [];
       file.on('data', chunk => chunks.push(chunk));
       file.on('end', () => {
-        files.push({
-          fieldname: name,
-          filename,
-          encoding,
-          mimetype,
-          size: Buffer.concat(chunks).length
-        });
+        fileBuffer = Buffer.concat(chunks);
+        console.log(`File size: ${fileBuffer.length} bytes`);
       });
     });
 
-    busboy.on('finish', () => {
-      return res.status(200).json({
-        message: 'Upload received',
-        fields,
-        files
-      });
+    busboy.on('finish', async () => {
+      if (!fileBuffer) {
+        return res.status(400).json({ error: 'No file received' });
+      }
+
+      const form = new FormData();
+      form.append('reqtype', 'fileupload');
+      form.append('fileToUpload', fileBuffer, filename);
+
+      try {
+        const catboxRes = await fetch('https://catbox.moe/user/api.php', {
+          method: 'POST',
+          body: form,
+          headers: form.getHeaders()
+        });
+
+        const url = await catboxRes.text();
+        console.log('Catbox response:', url);
+
+        return res.status(200).json({
+          message: 'File uploaded to Catbox',
+          url,
+          fields,
+          filename,
+          mimetype
+        });
+      } catch (err) {
+        console.error('Catbox upload failed:', err);
+        return res.status(500).json({ error: 'Catbox upload failed' });
+      }
     });
 
     req.pipe(busboy);
