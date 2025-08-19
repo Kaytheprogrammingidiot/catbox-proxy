@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  // Read raw body
+  // Only attach listeners for POST
   let rawBody = '';
   req.on('data', chunk => {
     rawBody += chunk;
